@@ -120,7 +120,9 @@ adminRouter.post('/course', adminMiddleware, async (req, res) => {
 
 adminRouter.put('/course', adminMiddleware, async (req, res) => {
     // Probably we will be supplied the courseId for the course that need to be updated.
+    
     let { title, description, price, imageurl } = req.body;
+
     console.log(title, description, price, imageurl);
 
     let userData = {};
@@ -149,8 +151,11 @@ adminRouter.put('/course', adminMiddleware, async (req, res) => {
         console.log("findCourse : ", findCourse);
         if (findCourse) {
             try {
+                console.log("coruse Id : ", courseId);
+                console.log("admin Id : ", req.adminId);
+                
                 let updatedData = await CourseModel.updateOne(
-                    { _id: courseId },
+                    { _id: courseId, creatorId: req.adminId },
                     { $set: userData }
                 )
                 console.log("Updated Data : ", updatedData);
