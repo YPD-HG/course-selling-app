@@ -1,20 +1,20 @@
 require('dotenv').config()
 const jwt = require('jsonwebtoken')
-const {UserModel} = require('../db')
+const { UserModel } = require('../db')
 
 async function userMiddleware(req, res, next) {
     const token = req.headers.token;
     if (token) {
         try {
             const userId = jwt.verify(token, process.env.JWT_SECRET_USER);
-            console.log("UserId : ", userId);
             if (userId) {
                 let user = await UserModel.findById(userId)
-                console.log("user : ", user);
                 if (!user) {
-                    console.log("User not found");
+                    res.json({
+                        message: "User not found."
+                    })
                 }
-                req.userId = user;
+                req.userData = user;
                 next();
             }
         } catch (e) {
@@ -23,9 +23,13 @@ async function userMiddleware(req, res, next) {
                 message: "Invalid Token"
             })
         }
+    } else {
+        res.json({
+            message: "Token missing"
+        })
     }
 }
 
-module.exports={
+module.exports = {
     userMiddleware
 }

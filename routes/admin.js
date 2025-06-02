@@ -31,11 +31,8 @@ adminRouter.post('/signup', async (req, res) => {
         let foundAdmin = await AdminModel.find({
             email
         })
-        console.log("Found Admin : ", foundAdmin.length);
         password = await bcrypt.hash(password, 10)
-        console.log("Password : ", password);
         if (foundAdmin.length == 0) {
-            console.log("New Admin");
             try {
                 await AdminModel.create({
                     email: email,
@@ -71,7 +68,6 @@ adminRouter.post('/signin', async (req, res) => {
     })
     if (foundAdmin) {
         let passwordCheck = await bcrypt.compare(password, foundAdmin.password)
-        console.log("PasswordCheck : ", passwordCheck);
         if (passwordCheck) {
             let id = foundAdmin._id.toString();
             try {
@@ -96,34 +92,45 @@ adminRouter.post('/signin', async (req, res) => {
 })
 
 adminRouter.post('/course', adminMiddleware, async (req, res) => {
-    const adminId = req.adminId;
-    console.log(adminId);
+    const adminId = req.adminData._id;
 
     let { title, description, price, imageurl } = req.body;
-
     try {
-        let course = await CourseModel.create({
-            title,
-            description,
-            price,
-            imageurl,
-            creatorId: adminId
+        let findCourse = await CourseModel.find({
+            title: title
         })
+        if (!findCourse.length) {
+            try {
+                let course = await CourseModel.create({
+                    title,
+                    description,
+                    price,
+                    imageurl,
+                    creatorId: adminId
+                })
+                res.json({
+                    message: "Admin creating course",
+                    courseId: course._id
+                })
+            } catch (error) {
+                console.log("Error while shoving course data in Database : ", error);
+            }
+        } else {
+            res.json({
+                message: "Course Already Exists"
+            })
+        }
+    } catch (e) {
         res.json({
-            message: "Admin creating course",
-            courseId: course._id
+            message: "Error while finding if course already exists"
         })
-    } catch (error) {
-        console.log("Error while shoving course data in Database : ", error);
     }
 })
 
 adminRouter.put('/course', adminMiddleware, async (req, res) => {
     // Probably we will be supplied the courseId for the course that need to be updated.
-    
-    let { title, description, price, imageurl } = req.body;
 
-    console.log(title, description, price, imageurl);
+    let { title, description, price, imageurl } = req.body;
 
     let userData = {};
     if (title !== undefined) {
@@ -139,26 +146,21 @@ adminRouter.put('/course', adminMiddleware, async (req, res) => {
         userData['imageurl'] = imageurl;
     }
 
-    console.log("User Data : ", userData);
-    console.log("User Data Title : ", userData.title);
-
-    let courseId = req.headers.courseid.toString();
-
+    let courseId = req.headers.courseid;
     if (courseId) {
         let findCourse = await CourseModel.findById({
             _id: courseId
         })
-        console.log("findCourse : ", findCourse);
         if (findCourse) {
             try {
-                console.log("coruse Id : ", courseId);
-                console.log("admin Id : ", req.adminId);
-                
+
                 let updatedData = await CourseModel.updateOne(
-                    { _id: courseId, creatorId: req.adminId },
+                    {
+                        _id: courseId,
+                        creatorId: req.adminData._id.toString()
+                    },
                     { $set: userData }
                 )
-                console.log("Updated Data : ", updatedData);
                 res.json({
                     message: "Data Updated succesfully!"
                 })
@@ -182,8 +184,7 @@ adminRouter.put('/course', adminMiddleware, async (req, res) => {
 })
 
 adminRouter.get('/course/bulk', adminMiddleware, async (req, res) => {
-    let adminId = req.adminId;
-    console.log(adminId);
+    let adminId = req.adminData._id;
     try {
         let allCourses = await CourseModel.find({
             creatorId: adminId
@@ -200,10 +201,36 @@ adminRouter.get('/course/bulk', adminMiddleware, async (req, res) => {
 
 })
 
-adminRouter.post('/delete-course', adminMiddleware, (req, res) => {
-    res.json({
-        message: "Admin Deleting course"
-    })
+adminRouter.post('/delete-course', adminMiddleware, async (req, res) => {
+    let adminId = req.adminData._id;
+    let courseId = req.headers.courseid;
+
+    try {
+        let findCourse = await CourseModel.findOne({
+            creatorId: adminId,
+            _id: courseId
+        })
+
+        if (findCourse) {
+            try {
+                let deleteCourse = await CourseModel.deleteOne({
+                    creatorId: adminId,
+                    _id: courseId
+                })
+                if (deleteCourse.deletedCount === 1) {
+                    res.json({
+                        message: "Item deleted succesfully.",
+                        deleteCourse
+                    })
+                }
+
+            } catch (e) {
+                console.log("Error while deleting item", e)
+            }
+        }
+    } catch (e) {
+        console.log("Error while fetching course")
+    }
 })
 
 adminRouter.post('/add-course-content', adminMiddleware, (req, res) => {

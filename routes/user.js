@@ -6,8 +6,8 @@ const express = require('express')
 const bcrypt = require('bcrypt')
 const { z } = require('zod')
 
-const { UserModel } = require('../db')
-const {userMiddleware} = require('../middleware/user')
+const { UserModel, PurchaseModel, CourseModel } = require('../db')
+const { userMiddleware } = require('../middleware/user')
 
 const userRouter = express.Router();
 // mongoose.connect(process.env.MONGOOSE_STRING)
@@ -32,18 +32,14 @@ userRouter.post('/signup', async (req, res) => {
             .string()
     })
     let { email, password, firstName, lastName } = req.body
-    console.log("password : ", password);
 
     const result = userCredentials.safeParse({ email: email, password: password, firstName: firstName, lastName: lastName });
     if (result.success) {
         let foundUser = await UserModel.find({
             email
         })
-        console.log("Found User : ", foundUser.length);
         password = await bcrypt.hash(password, 10)
-        console.log("Password : ", password);
         if (foundUser.length == 0) {
-            console.log("New User");
             try {
                 await UserModel.create({
                     email,
@@ -80,7 +76,6 @@ userRouter.post('/signin', async (req, res) => {
 
     if (foundUser) {
         let passwordCheck = await bcrypt.compare(password, foundUser.password)
-        console.log("PasswordCheck : ", passwordCheck);
         if (passwordCheck) {
             let id = foundUser._id.toString();
             try {
@@ -104,10 +99,33 @@ userRouter.post('/signin', async (req, res) => {
     }
 })
 
-userRouter.post('/purchases', userMiddleware, (req, res) => {
-    res.json({
-        message: "All purchased course"
-    })
+userRouter.post('/purchases', userMiddleware, async (req, res) => {
+    let userId = req.userData._id;
+
+    try {
+        let AllPurchasedCourses = await PurchaseModel.find({
+            userId
+        })
+        if (AllPurchasedCourses) {
+
+            // Find me the course data whose 'id' is 'in', this array  AllPurchasedCourses.map(x => x.courseId)
+            const courseData = await CourseModel.find({
+                _id: { $in: AllPurchasedCourses.map(x => x.courseId) }
+            })
+
+            // Fetch all course documents whose _id matches any courseId from the AllPurchasedCourses array.
+            // AllPurchasedCourses contains objects with userId and courseId.
+            // .map(x => x.courseId) extracts all courseIds, and $in filters the courses by these IDs.
+
+
+            res.json({
+                AllPurchasedCourses,
+                courseData
+            })
+        }
+    } catch (e) {
+        console.log("Error while finding the course.", e)
+    }
 })
 
 module.exports = userRouter;
